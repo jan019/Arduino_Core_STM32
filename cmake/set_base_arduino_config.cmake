@@ -34,6 +34,10 @@ target_compile_options(base_config INTERFACE
 	$<$<COMPILE_LANGUAGE:CXX>:-fno-threadsafe-statics>
 	-ffunction-sections
 	-fdata-sections
+	-Wall
+	#-Werror
+	-Wpedantic
+	-Wextra
 )
 
 target_link_options(base_config INTERFACE
