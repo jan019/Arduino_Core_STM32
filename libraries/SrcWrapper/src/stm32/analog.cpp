@@ -101,6 +101,21 @@ static PinName g_current_pin = NC;
 #define ADC_REGULAR_RANK_1  1
 #endif
 
+#if defined(ADC5)
+#define ADC_COUNT 5
+#elif defined(ADC4)
+#define ADC_COUNT 4
+#elif defined(ADC3)
+#define ADC_COUNT 3
+#elif defined(ADC2)
+#define ADC_COUNT 2
+#elif defined(ADC1)
+#define ADC_COUNT 1
+#endif
+
+
+uint8_t adc_is_active[ADC_COUNT] = {0};
+
 /* Exported Functions */
 /**
   * @brief  Return ADC HAL channel linked to a PinName
@@ -770,9 +785,10 @@ uint16_t adc_read_value(PinName pin, uint32_t resolution)
   ADC_HandleTypeDef AdcHandle = {};
   ADC_ChannelConfTypeDef  AdcChannelConf = {};
   __IO uint16_t uhADCxConvertedValue = 0;
-  uint32_t samplingTime = ADC_SAMPLINGTIME;
+  uint32_t samplingTime = ADC_SAMPLETIME_1CYCLE_5;
   uint32_t channel = 0;
   uint32_t bank = 0;
+  uint8_t adc_index = 0;
 
   if ((pin & PADC_BASE) && (pin < ANA_START)) {
 #if defined(STM32H7xx) || defined(STM32MP1xx)
@@ -790,7 +806,7 @@ uint16_t adc_read_value(PinName pin, uint32_t resolution)
 #endif
 #endif
     channel = get_adc_internal_channel(pin);
-    samplingTime = ADC_SAMPLINGTIME_INTERNAL;
+    samplingTime = ADC_SAMPLETIME_1CYCLE_5;
   } else {
     AdcHandle.Instance = (ADC_TypeDef *)pinmap_peripheral(pin, PinMap_ADC);
     channel = get_adc_channel(pin, &bank);
@@ -808,7 +824,32 @@ uint16_t adc_read_value(PinName pin, uint32_t resolution)
 
   if (AdcHandle.Instance == NP) {
     return 0;
+  } else if (AdcHandle.Instance == ADC1) {
+    adc_index = 0;
   }
+#ifdef ADC2
+  else if (AdcHandle.Instance == ADC2) {
+    adc_index = 1;
+  }
+#endif
+#ifdef ADC3
+  else if (AdcHandle.Instance == ADC3) {
+    adc_index = 2;
+  }
+#endif
+#ifdef ADC4
+  else if (AdcHandle.Instance == ADC4) {
+    adc_index = 3;
+  }
+#endif
+#ifdef ADC5
+  else if (AdcHandle.Instance == ADC5) {
+    adc_index = 4;
+  }
+#endif
+
+if (!adc_is_active[adc_index]) {
+adc_is_active[adc_index] = true;
 
 #ifdef ADC_CLOCK_DIV
   AdcHandle.Init.ClockPrescaler        = ADC_CLOCK_DIV;                 /* (A)synchronous clock mode, input ADC clock divided */
@@ -989,11 +1030,20 @@ uint16_t adc_read_value(PinName pin, uint32_t resolution)
 #else
   if (HAL_ADCEx_Calibration_Start(&AdcHandle) !=  HAL_OK)
 #endif
-  {
-    /* ADC Calibration Error */
+    {
+      /* ADC Calibration Error */
+      return 0;
+    }
+#endif
+
+  } // Initialize ADC only once
+
+  /*##-2- Configure ADC regular channel ######################################*/
+  if (HAL_ADC_ConfigChannel(&AdcHandle, &AdcChannelConf) != HAL_OK) {
+    /* Channel Configuration Error */
     return 0;
   }
-#endif
+
 
   /*##-3- Start the conversion process ####################*/
   if (HAL_ADC_Start(&AdcHandle) != HAL_OK) {
@@ -1016,18 +1066,7 @@ uint16_t adc_read_value(PinName pin, uint32_t resolution)
     uhADCxConvertedValue = HAL_ADC_GetValue(&AdcHandle);
   }
 
-  if (HAL_ADC_Stop(&AdcHandle) != HAL_OK) {
-    /* Stop Conversation Error */
-    return 0;
-  }
 
-  if (HAL_ADC_DeInit(&AdcHandle) != HAL_OK) {
-    return 0;
-  }
-
-  if (__LL_ADC_COMMON_INSTANCE(AdcHandle.Instance) != 0U) {
-    LL_ADC_SetCommonPathInternalCh(__LL_ADC_COMMON_INSTANCE(AdcHandle.Instance), LL_ADC_PATH_INTERNAL_NONE);
-  }
   return uhADCxConvertedValue;
 }
 #endif /* HAL_ADC_MODULE_ENABLED && !HAL_ADC_MODULE_ONLY*/
