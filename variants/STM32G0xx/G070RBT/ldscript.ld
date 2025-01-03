@@ -41,11 +41,18 @@ _estack = ORIGIN(RAM) + LENGTH(RAM); /* end of "RAM" Ram type memory */
 _Min_Heap_Size = 0x400 ; /* required amount of heap */
 _Min_Stack_Size = 0x800 ; /* required amount of stack */
 
+/* Define the size of the ID storage and the flash size */
+ID_STORAGE_SIZE = 0x800; /* 2 KB */
+FLASH_SIZE = LD_MAX_SIZE - LD_FLASH_OFFSET - ID_STORAGE_SIZE;
+
 /* Memories definition */
 MEMORY
 {
   RAM    (xrw)    : ORIGIN = 0x20000000,   LENGTH = LD_MAX_DATA_SIZE
-  FLASH    (rx)    : ORIGIN = 0x8000000 + LD_FLASH_OFFSET, LENGTH = LD_MAX_SIZE - LD_FLASH_OFFSET
+  FLASH    (rx)    : ORIGIN = 0x8000000 + LD_FLASH_OFFSET, LENGTH = FLASH_SIZE
+
+  /* Reserve the last 2 KB for the ID */
+  ID_STORAGE (rw) : ORIGIN = 0x8000000 + FLASH_SIZE, LENGTH = ID_STORAGE_SIZE
 }
 
 /* Sections */
@@ -172,6 +179,14 @@ SECTIONS
     . = . + _Min_Stack_Size;
     . = ALIGN(8);
   } >RAM
+
+  /* Place the custom ID section here */
+  .id_section :
+  {
+    . = ALIGN(4);
+    KEEP(*(.id))        /* Keep anything in the .id section from being stripped */
+    . = ALIGN(4);
+  } > ID_STORAGE
 
   /* Remove information from the compiler libraries */
   /DISCARD/ :
