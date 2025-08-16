@@ -55,6 +55,9 @@ EEPROM_EMU_SIZE                  = 0x800;  /* 2 KB */
 
 /* Total flash available to the linker (e.g., 128K on STM32G070RB) is LD_MAX_SIZE
    Application starts at FLASH_BASE_ADDR + LD_FLASH_OFFSET */
+/*   "LINKER:--defsym=LD_FLASH_OFFSET=0"
+	"LINKER:--defsym=LD_MAX_SIZE=131072"
+	"LINKER:--defsym=LD_MAX_DATA_SIZE=36864" */
 FLASH_APP_ORIGIN = FLASH_BASE_ADDR + LD_FLASH_OFFSET;
 
 /* Application flash length = total - offset - ID - EEPROM emu */
@@ -63,11 +66,14 @@ FLASH_APP_SIZE = LD_MAX_SIZE - LD_FLASH_OFFSET
                                - EEPROM_EMU_SIZE;
 
 /* ID section sits right after the app */
+/* with current setup the value of this is 0x0801F000*/
 ID_AND_HW_VERSION_STORAGE_ORIGIN = FLASH_APP_ORIGIN + FLASH_APP_SIZE;
 
 /* EEPROM emu occupies the very end of flash */
+/* with current setup the value of this is 0x0801F800*/
 EEPROM_EMU_ORIGIN = ID_AND_HW_VERSION_STORAGE_ORIGIN + ID_AND_HW_VERSION_STORAGE_SIZE;
 
+/* LD_MAX_SIZE in hexa is 0x08020000*/
 /* Memories definition */
 MEMORY
 {
