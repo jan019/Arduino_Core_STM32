@@ -41,18 +41,45 @@ _estack = ORIGIN(RAM) + LENGTH(RAM); /* end of "RAM" Ram type memory */
 _Min_Heap_Size = 0x400 ; /* required amount of heap */
 _Min_Stack_Size = 0x800 ; /* required amount of stack */
 
-/* Define the size of the ID storage and the flash size */
-ID_AND_HW_VERSION_STORAGE_SIZE = 0x800; /* 2 KB */
-FLASH_SIZE = LD_MAX_SIZE - LD_FLASH_OFFSET - ID_AND_HW_VERSION_STORAGE_SIZE;
+/* ----------------- Device / layout constants ----------------- */
+FLASH_BASE_ADDR                  = 0x08000000;
+
+/* Flash page size on STM32G070 = 2 KB (0x800) */
+FLASH_PAGE_SIZE                  = 0x800;
+
+/* Ccustom ID and HW version area size: one page (2 KB) */
+ID_AND_HW_VERSION_STORAGE_SIZE   = 0x800;   /* 2 KB */
+
+/* Arduino EEPROM emulation: reserve one page (2 KB) */
+EEPROM_EMU_SIZE                  = 0x800;  /* 2 KB */
+
+/* Total flash available to the linker (e.g., 128K on STM32G070RB) is LD_MAX_SIZE
+   Application starts at FLASH_BASE_ADDR + LD_FLASH_OFFSET */
+FLASH_APP_ORIGIN = FLASH_BASE_ADDR + LD_FLASH_OFFSET;
+
+/* Application flash length = total - offset - ID - EEPROM emu */
+FLASH_APP_SIZE = LD_MAX_SIZE - LD_FLASH_OFFSET
+                               - ID_AND_HW_VERSION_STORAGE_SIZE
+                               - EEPROM_EMU_SIZE;
+
+/* ID section sits right after the app */
+ID_AND_HW_VERSION_STORAGE_ORIGIN = FLASH_APP_ORIGIN + FLASH_APP_SIZE;
+
+/* EEPROM emu occupies the very end of flash */
+EEPROM_EMU_ORIGIN = ID_AND_HW_VERSION_STORAGE_ORIGIN + ID_AND_HW_VERSION_STORAGE_SIZE;
 
 /* Memories definition */
 MEMORY
 {
   RAM    (xrw)    : ORIGIN = 0x20000000,   LENGTH = LD_MAX_DATA_SIZE
-  FLASH    (rx)    : ORIGIN = 0x8000000 + LD_FLASH_OFFSET, LENGTH = FLASH_SIZE
+  FLASH    (rx)    : ORIGIN = FLASH_APP_ORIGIN, LENGTH = FLASH_APP_SIZE
 
-  /* Reserve the last 2 KB for the ID */
-  ID_AND_HW_VERSION_STORAGE (rw) : ORIGIN = 0x8000000 + FLASH_SIZE, LENGTH = ID_AND_HW_VERSION_STORAGE_SIZE
+  /* 2 KB page reserved for ID/HW version (just before EEPROM emu) */
+  ID_AND_HW_VERSION_STORAGE (rw)    : ORIGIN = ID_AND_HW_VERSION_STORAGE_ORIGIN,
+                                      LENGTH = ID_AND_HW_VERSION_STORAGE_SIZE
+
+  /* Last 4 KB reserved for Arduino EEPROM emulation */
+  EEPROM_EMU (r)                    : ORIGIN = EEPROM_EMU_ORIGIN, LENGTH = EEPROM_EMU_SIZE
 }
 
 /* Sections */
