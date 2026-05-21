@@ -42,15 +42,46 @@ _Min_Heap_Size = 0x400 ; /* required amount of heap */
 _Min_Stack_Size = 0x800 ; /* required amount of stack */
 
 /* ----------------- Device / layout constants ----------------- */
+/*
+ * STM32G070RB flash memory layout (128 KB total, single bank, 2 KB pages)
+ *
+ *   0x08000000  +-------------------------------------+
+ *               |  Application code (.text, .rodata,  |
+ *               |  .isr_vector, init/fini arrays)     |  124 KB
+ *               |  Pages 0..61                        |  (62 pages)
+ *   0x0801F000  +-------------------------------------+
+ *               |  ID_AND_HW_VERSION_STORAGE          |   2 KB
+ *               |  Page 62 (second-to-last)           |  (1 page)
+ *               |    Configuration::ID_ADDRESS         = 0x0801F000
+ *               |    Configuration::HW_VERSION_ADDRESS = 0x0801F010
+ *   0x0801F800  +-------------------------------------+
+ *               |  EEPROM_EMU                         |   2 KB
+ *               |  Page 63 (last page of flash)       |  (1 page)
+ *               |  Written exclusively by the Arduino |
+ *               |  EEPROM library, which always       |
+ *               |  targets (FLASH_END+1) - FLASH_PAGE_SIZE
+ *               |  i.e. the last flash page.          |
+ *   0x08020000  +-------------------------------------+  (flash end)
+ *
+ * The agreement between this script and the EEPROM library is not enforced
+ * by either side at build time -- they independently arrive at 0x0801F800.
+ * The ASSERT() statements at the bottom of the SECTIONS{} block lock this
+ * in; the mirror static_assert lives in src/distanceSensor.cpp.
+ */
 FLASH_BASE_ADDR                  = 0x08000000;
 
-/* Flash page size on STM32G070 = 2 KB (0x800) */
+/* Flash page size on STM32G070 = 2 KB (0x800).
+ * Must match FLASH_PAGE_SIZE in stm32g0xx_hal_flash.h - the EEPROM library
+ * erases one HAL-defined page on every flush. */
 FLASH_PAGE_SIZE                  = 0x800;
 
-/* Ccustom ID and HW version area size: one page (2 KB) */
+/* Custom ID and HW version area size: one page (2 KB).
+ * Sized to one full page so it can be reprogrammed by ST-LINK independently
+ * without disturbing application code. */
 ID_AND_HW_VERSION_STORAGE_SIZE   = 0x800;   /* 2 KB */
 
-/* Arduino EEPROM emulation: reserve one page (2 KB) */
+/* Arduino EEPROM emulation: reserve one page (2 KB).
+ * Must equal FLASH_PAGE_SIZE - the library erases exactly one page per flush. */
 EEPROM_EMU_SIZE                  = 0x800;  /* 2 KB */
 
 /* Total flash available to the linker (e.g., 128K on STM32G070RB) is LD_MAX_SIZE
@@ -230,4 +261,17 @@ SECTIONS
   }
 
   .ARM.attributes 0 : { *(.ARM.attributes) }
+
+  /* ----------------- Flash layout invariants -----------------
+   * If any of these fire, the EEPROM emulation library and the linker
+   * script disagree about where data lives, and the next EEPROM.put()
+   * will silently erase the wrong page (most likely the ID/HW version
+   * page or application code).
+   * See the layout diagram at the top of this file. */
+  ASSERT(EEPROM_EMU_ORIGIN == FLASH_BASE_ADDR + LD_MAX_SIZE - FLASH_PAGE_SIZE,
+    "EEPROM_EMU region must be the last flash page - the Arduino EEPROM library writes there unconditionally.")
+  ASSERT(EEPROM_EMU_SIZE == FLASH_PAGE_SIZE,
+    "EEPROM_EMU region must be exactly one flash page - the library erases a full page on each flush.")
+  ASSERT(ID_AND_HW_VERSION_STORAGE_ORIGIN + ID_AND_HW_VERSION_STORAGE_SIZE == EEPROM_EMU_ORIGIN,
+    "ID region must sit immediately before EEPROM_EMU (no gap, no overlap).")
 }
